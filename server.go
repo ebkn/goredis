@@ -28,22 +28,16 @@ func (s *Server) Start(handler Handler) error {
 
 	log.Printf("Starting server at :%d.\n", s.port)
 
-	errChan := make(chan error, 1)
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			return err
 		}
 
-		select {
-		case err := <-errChan:
-			return err
-		default:
-			go func() {
-				if err := handler(conn); err != nil {
-					errChan <- err
-				}
-			}()
-		}
+		go func() {
+			if err := handler(conn); err != nil {
+				log.Println(err)
+			}
+		}()
 	}
 }

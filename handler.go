@@ -1,8 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"io"
-	"log"
 )
 
 var (
@@ -12,12 +12,21 @@ var (
 func handler(conn io.ReadWriteCloser) error {
 	defer conn.Close()
 
-	req := make([]byte, 100)
-	if _, err := conn.Read(req); err != nil {
+	decoder, err := NewRESPDecoder(conn)
+	if err != nil {
 		return err
 	}
 
-	log.Print(string(req))
+	req, err := decoder.Decode()
+	if err != nil {
+		// TODO
+		if _, err := conn.Write([]byte(err.Error())); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	fmt.Println(req)
 
 	if _, err := conn.Write([]byte("+PONG\r\n")); err != nil {
 		return err

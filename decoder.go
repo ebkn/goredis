@@ -42,36 +42,26 @@ func NewRESPDecoder(reader io.Reader) (*RESPDecoder, error) {
 		return nil, err
 	}
 
+	if !bytes.Contains(buf, []byte("\r\n")) {
+		return nil, fmt.Errorf("message should have carriage returns")
+	}
+
 	return &RESPDecoder{
 		raw: buf,
 	}, nil
 }
 
-func (d *RESPDecoder) seek(size int) error {
-	if len(d.raw) < size {
-		return fmt.Errorf("failed to seek message")
-	}
-	d.raw = d.raw[size:]
-	return nil
-}
-
-func (d *RESPDecoder) seekToCRLF() ([]byte, error) {
-	arr := bytes.Split(d.raw, []byte(CRLF))
-	if len(arr) == 0 {
-		return nil, fmt.Errorf("failed to seek message")
-	}
-	el := arr[0]
-	d.seek(len(string(el)) + len(CRLF))
-	return el, nil
-}
-
 func (d *RESPDecoder) Decode() ([]string, error) {
-	del := d.raw[0]
-	if err := d.seek(1); err != nil {
+	del, err := d.get(0, 1)
+	if err != nil {
 		return nil, err
 	}
 
 	if string(del) == CommandDelimiterArrays {
+		if err := d.seek(1); err != nil {
+			return nil, err
+		}
+
 		sizeStr, err := d.seekToCRLF()
 		if err != nil {
 			return nil, err
@@ -92,9 +82,6 @@ func (d *RESPDecoder) Decode() ([]string, error) {
 		return arr, nil
 	}
 
-	if _, err := d.seekToCRLF(); err != nil {
-		return nil, err
-	}
 	str, err := d.decode()
 	if err != nil {
 		return nil, err
@@ -102,8 +89,37 @@ func (d *RESPDecoder) Decode() ([]string, error) {
 	return []string{str}, nil
 }
 
+func (d *RESPDecoder) get(start, end int) ([]byte, error) {
+	str := string(d.raw)
+	if start > len(str) || end > len(str) || start > end {
+		return nil, fmt.Errorf("failed to get bytes")
+	}
+	return []byte(str[start:end]), nil
+}
+
+func (d *RESPDecoder) seek(size int) error {
+	if len(d.raw) < size {
+		return fmt.Errorf("failed to seek message")
+	}
+	d.raw = []byte(string(d.raw)[size:])
+	return nil
+}
+
+func (d *RESPDecoder) seekToCRLF() ([]byte, error) {
+	arr := bytes.Split(d.raw, []byte(CRLF))
+	if len(arr) == 0 {
+		return nil, fmt.Errorf("failed to seek message")
+	}
+	el := arr[0]
+	d.seek(len(string(el)) + len(CRLF))
+	return el, nil
+}
+
 func (d *RESPDecoder) decode() (string, error) {
-	del := d.raw[0]
+	del, err := d.get(0, 1)
+	if err != nil {
+		return "", err
+	}
 	if err := d.seek(1); err != nil {
 		return "", err
 	}
@@ -116,8 +132,11 @@ func (d *RESPDecoder) decode() (string, error) {
 		}
 		return str, nil
 	case CommandDelimiterIntegers:
-		// TODO
-		return "", nil
+		str, err := d.decodeInteger()
+		if err != nil {
+			return "", fmt.Errorf("%w %v", ErrInvalidMessage, err)
+		}
+		return str, nil
 	case CommandDelimiterBulkStrings:
 		str, err := d.decodeBulkStrings()
 		if err != nil {
@@ -125,7 +144,7 @@ func (d *RESPDecoder) decode() (string, error) {
 		}
 		return str, nil
 	default:
-		return "", fmt.Errorf("%w invalid command delimiter %s.", ErrInvalidMessage, string(del))
+		return "", fmt.Errorf("%w invalid command delimiter. del=%s", ErrInvalidMessage, string(del))
 	}
 }
 
@@ -162,7 +181,7 @@ func (d *RESPDecoder) decodeBulkStrings() (string, error) {
 		return "", err
 	}
 	if len(string(str)) != size {
-		return "", err
+		return "", fmt.Errorf("size should be equal to message length")
 	}
 	return string(str), nil
 }

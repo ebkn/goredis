@@ -1,28 +1,70 @@
 package main
 
 import (
-	"io"
 	"reflect"
+	"strings"
 	"testing"
 )
 
 func TestRESPDecoder_Decode(t *testing.T) {
-	type args struct {
-		reader io.Reader
-	}
 	tests := []struct {
 		name    string
-		d       *RESPDecoder
-		args    args
-		want    *DecodedMessage
+		msg     string
+		want    []string
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name:    "string",
+			msg:     "+PING\r\n",
+			want:    []string{"PING"},
+			wantErr: false,
+		},
+		{
+			name:    "integer",
+			msg:     ":1\r\n",
+			want:    []string{"1"},
+			wantErr: false,
+		},
+		{
+			name:    "bulk string",
+			msg:     "$3\r\nFOO\r\n",
+			want:    []string{"FOO"},
+			wantErr: false,
+		},
+		{
+			name:    "arrays",
+			msg:     "*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n",
+			want:    []string{"ECHO", "hey"},
+			wantErr: false,
+		},
+		{
+			name:    "error when no content",
+			msg:     "+",
+			wantErr: true,
+		},
+		{
+			name:    "error when no crlf",
+			msg:     "+OK",
+			wantErr: true,
+		},
+		{
+			name:    "error when invalid crlf",
+			msg:     "+OK\r",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := &RESPDecoder{}
-			got, err := d.Decode(tt.args.reader)
+			d, err := NewRESPDecoder(strings.NewReader(tt.msg))
+			if err != nil {
+				if !tt.wantErr {
+					t.Errorf("RESPDecoder.Decode() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				return
+			}
+
+			got, err := d.Decode()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RESPDecoder.Decode() error = %v, wantErr %v", err, tt.wantErr)
 				return

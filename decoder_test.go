@@ -32,7 +32,13 @@ func TestRESPDecoder_Decode(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "arrays",
+			name:    "arrays with 1 value",
+			msg:     "*1\r\n$4\r\nPING\r\n",
+			want:    []string{"PING"},
+			wantErr: false,
+		},
+		{
+			name:    "arrays with 1 values",
 			msg:     "*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n",
 			want:    []string{"ECHO", "hey"},
 			wantErr: false,
@@ -50,6 +56,26 @@ func TestRESPDecoder_Decode(t *testing.T) {
 		{
 			name:    "error when invalid crlf",
 			msg:     "+OK\r",
+			wantErr: true,
+		},
+		{
+			name:    "error when invalid crlf",
+			msg:     "+OK\n",
+			wantErr: true,
+		},
+		{
+			name:    "error when invalid size",
+			msg:     "*1\r\n$3\r\nPING\r\n",
+			wantErr: true,
+		},
+		{
+			name:    "error when no content in array",
+			msg:     "*1\r\n$4",
+			wantErr: true,
+		},
+		{
+			name:    "error when invalid array size",
+			msg:     "*2\r\n$4\r\nECHO\r\n",
 			wantErr: true,
 		},
 	}

@@ -9,14 +9,14 @@ import (
 )
 
 type (
-	RESPCommand      int
+	RESPCommand      string
 	CommandDelimiter string
 )
 
 const (
-	RESPCommand_UNKNOWN RESPCommand = iota
-	RESPCommand_PING
-	RESPCommand_ECHO
+	RESPCommand_UNKNOWN RESPCommand = "UNKNOWN"
+	RESPCommand_PING                = "PING"
+	RESPCommand_ECHO                = "ECHO"
 
 	CommandDelimiterSimpleStrings = "+"
 	CommandDelimiterErrors        = "-"
@@ -36,6 +36,10 @@ var (
 type RESPDecoder struct {
 	raw string
 }
+type RESPResult struct {
+	Command RESPCommand
+	Raw     []string
+}
 
 func NewRESPDecoder(reader io.Reader) (*RESPDecoder, error) {
 	buf := make([]byte, 1024) // TODO support large size
@@ -53,12 +57,13 @@ func NewRESPDecoder(reader io.Reader) (*RESPDecoder, error) {
 	}, nil
 }
 
-func (d *RESPDecoder) Decode() ([]string, error) {
+func (d *RESPDecoder) Decode() (*RESPResult, error) {
 	del, err := d.get(0, 1)
 	if err != nil {
 		return nil, err
 	}
 
+	var raw []string
 	if del == CommandDelimiterArrays {
 		if err := d.seek(1); err != nil {
 			return nil, err
@@ -81,14 +86,30 @@ func (d *RESPDecoder) Decode() ([]string, error) {
 			}
 			arr[i] = str
 		}
-		return arr, nil
+
+		raw = arr
+	} else {
+		str, err := d.decode()
+		if err != nil {
+			return nil, err
+		}
+		raw = []string{str}
 	}
 
-	str, err := d.decode()
-	if err != nil {
-		return nil, err
+	var cmd RESPCommand
+	switch strings.ToUpper(raw[0]) {
+	case RESPCommand_PING:
+		cmd = RESPCommand_PING
+	case RESPCommand_ECHO:
+		cmd = RESPCommand_ECHO
+	default:
+		cmd = RESPCommand_UNKNOWN
 	}
-	return []string{str}, nil
+
+	return &RESPResult{
+		Command: cmd,
+		Raw:     raw,
+	}, nil
 }
 
 func (d *RESPDecoder) get(start, end int) (string, error) {

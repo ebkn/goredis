@@ -8,9 +8,9 @@ This repository is inspired by [Build Your Own Redis](https://rohitpaulk.com/art
 
 ### 1.Handling basic commands
 
-- `PING`
-- `SET`
-- `GET`
+- [x] `PING`
+- [ ] `SET`
+- [ ] `GET`
 
 ### 2.Speak the Redis Protocol
 

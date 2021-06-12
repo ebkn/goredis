@@ -17,6 +17,7 @@ const (
 	RESPCommand_UNKNOWN RESPCommand = "UNKNOWN"
 	RESPCommand_PING                = "PING"
 	RESPCommand_ECHO                = "ECHO"
+	RESPCommand_COMMAND             = "COMMAND"
 
 	CommandDelimiterSimpleStrings = "+"
 	CommandDelimiterErrors        = "-"

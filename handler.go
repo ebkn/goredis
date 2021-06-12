@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"io"
+	"log"
 )
 
 var (
@@ -18,16 +20,17 @@ func handler(conn io.ReadWriteCloser) error {
 
 	decoded, err := decoder.Decode()
 	if err != nil {
-		// TODO
-		if _, err := conn.Write([]byte(err.Error())); err != nil {
+		if _, err := conn.Write(formatError(err)); err != nil {
 			return err
 		}
-		return nil
+		return err
 	}
 
 	encoder := NewRESPEncoder()
 
 	switch decoded.Command {
+	case RESPCommand_COMMAND:
+		return nil
 	case RESPCommand_PING:
 		var str string
 		switch len(decoded.Raw) {
@@ -36,8 +39,8 @@ func handler(conn io.ReadWriteCloser) error {
 		case 2:
 			str = decoded.Raw[1]
 		default:
-			// TODO
-			if _, err := conn.Write([]byte("wrong number of arguments")); err != nil {
+			errMsg := fmt.Errorf("wrong number of arguments")
+			if _, err := conn.Write(formatError(errMsg)); err != nil {
 				return err
 			}
 			return nil
@@ -52,9 +55,10 @@ func handler(conn io.ReadWriteCloser) error {
 		}
 	case RESPCommand_ECHO:
 		if len(decoded.Raw) != 2 {
-			// TODO
-			if _, err := conn.Write([]byte("wrong number of arguments")); err != nil {
-				return err
+			errMsg := fmt.Errorf("wrong number of arguments")
+			if _, err := conn.Write(formatError(errMsg)); err != nil {
+				log.Println(err)
+				return nil
 			}
 			return nil
 		}
@@ -68,19 +72,15 @@ func handler(conn io.ReadWriteCloser) error {
 			return err
 		}
 	default:
-		// TODO initial command
-		msg, err := encoder.EncodeString(RESPResponse_PONG)
-		if err != nil {
+		errMsg := fmt.Errorf("unknown command %s", decoded.Raw[0])
+		if _, err := conn.Write(formatError(errMsg)); err != nil {
 			return err
 		}
-		if _, err := conn.Write(msg); err != nil {
-			return err
-		}
-		// TODO error
-		// if _, err := conn.Write([]byte("unknown command")); err != nil {
-		// 	return err
-		// }
 	}
 
 	return nil
+}
+
+func formatError(err error) []byte {
+	return []byte(fmt.Sprintf("%s%v%s", CommandDelimiterErrors, err, CRLF))
 }
